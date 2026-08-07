@@ -1,0 +1,162 @@
+<div class="dashboard">
+  <div class="header">
+    <h2>Admin Dashboard - {{ auth.getFullName() }}</h2>
+    <button (click)="logout()">Logout</button>
+  </div>
+
+  <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <div class="tabs">
+    <button (click)="setTab('transactions')" [class.active]="activeTab === 'transactions'">
+      Transactions
+    </button>
+    <button (click)="setTab('history')" [class.active]="activeTab === 'history'">
+      Approval History
+    </button>
+    <button (click)="setTab('reports')" [class.active]="activeTab === 'reports'">Reports</button>
+  </div>
+
+  <!-- Transactions Tab -->
+  <div *ngIf="activeTab === 'transactions'">
+    <div class="filters">
+      <input
+        type="text"
+        placeholder="Filter by employee"
+        [(ngModel)]="filterEmployee"
+        (input)="loadTransactions()"
+      />
+      <select [(ngModel)]="filterStatus" (change)="loadTransactions()">
+        <option value="">All Statuses</option>
+        <option value="PendingApproval">Pending Approval</option>
+        <option value="ChangeRequested">Change Requested</option>
+        <option value="Approved">Approved</option>
+        <option value="Paid">Paid</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Employee</th>
+          <th>Currency</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of transactions">
+          <td>{{ t.id }}</td>
+          <td>{{ t.employeeName }}</td>
+          <td>{{ t.currency }}</td>
+          <td>{{ t.totalAmount }}</td>
+          <td>{{ t.status }}</td>
+          <td>{{ t.createdDate | date: 'short' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- History Tab -->
+  <div *ngIf="activeTab === 'history'">
+    <table>
+      <thead>
+        <tr>
+          <th>Form ID</th>
+          <th>Action By</th>
+          <th>Role</th>
+          <th>Action</th>
+          <th>Reason</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let h of history">
+          <td>{{ h.expenseFormId }}</td>
+          <td>{{ h.actionBy }}</td>
+          <td>{{ h.actionByRole }}</td>
+          <td>{{ h.action }}</td>
+          <td>{{ h.reason || '-' }}</td>
+          <td>{{ h.actionDate | date: 'short' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Reports Tab -->
+  <div *ngIf="activeTab === 'reports'">
+    <h3>By Status</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Form Count</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of byStatus">
+          <td>{{ r.status }}</td>
+          <td>{{ r.formCount }}</td>
+          <td>{{ r.totalAmount }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>By Employee</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Form Count</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of byEmployee">
+          <td>{{ r.employeeName }}</td>
+          <td>{{ r.formCount }}</td>
+          <td>{{ r.totalAmount }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>By Category</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Item Count</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of byCategory">
+          <td>{{ r.category }}</td>
+          <td>{{ r.itemCount }}</td>
+          <td>{{ r.totalAmount }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Monthly Summary</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Month</th>
+          <th>Form Count</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of monthly">
+          <td>{{ r.year }}</td>
+          <td>{{ r.month }}</td>
+          <td>{{ r.formCount }}</td>
+          <td>{{ r.totalAmount }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

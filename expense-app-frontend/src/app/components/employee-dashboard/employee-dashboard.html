@@ -1,0 +1,98 @@
+<div class="dashboard">
+  <div class="header">
+    <h2>Employee Dashboard - {{ auth.getFullName() }}</h2>
+    <button (click)="logout()">Logout</button>
+  </div>
+
+  <p class="success" *ngIf="message">{{ message }}</p>
+  <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <div class="form-section">
+    <h3>{{ editingFormId ? 'Edit Expense Form' : 'Submit New Expense' }}</h3>
+
+    <label>Currency</label>
+    <select [(ngModel)]="currency">
+      <option value="PKR">PKR</option>
+      <option value="USD">USD</option>
+      <option value="EUR">EUR</option>
+      <option value="TL">TL</option>
+      <option value="INR">INR</option>
+    </select>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Purpose</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of items; let i = index">
+          <td><input type="date" [(ngModel)]="item.expenseDate" [name]="'date' + i" /></td>
+          <td><input type="text" [(ngModel)]="item.purpose" [name]="'purpose' + i" /></td>
+          <td><input type="text" [(ngModel)]="item.category" [name]="'category' + i" /></td>
+          <td>
+            <input type="number" [(ngModel)]="item.amount" [name]="'amount' + i" max="5000" />
+          </td>
+          <td><button (click)="removeItem(i)" *ngIf="items.length > 1">Remove</button></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button (click)="addItem()">+ Add Item</button>
+    <p>
+      <strong>Total: {{ totalAmount }} {{ currency }}</strong>
+    </p>
+
+    <button (click)="submitForm()">{{ editingFormId ? 'Update' : 'Submit' }}</button>
+    <button (click)="cancelEdit()" *ngIf="editingFormId">Cancel</button>
+  </div>
+
+  <div class="list-section">
+    <h3>My Expense Forms</h3>
+
+    <div class="filters">
+      <select [(ngModel)]="filterStatus" (change)="loadForms()">
+        <option value="">All Statuses</option>
+        <option value="PendingApproval">Pending Approval</option>
+        <option value="ChangeRequested">Change Requested</option>
+        <option value="Approved">Approved</option>
+        <option value="Paid">Paid</option>
+      </select>
+      <select [(ngModel)]="filterCurrency" (change)="loadForms()">
+        <option value="">All Currencies</option>
+        <option value="PKR">PKR</option>
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+      </select>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Currency</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Reason</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let form of forms">
+          <td>{{ form.id }}</td>
+          <td>{{ form.currency }}</td>
+          <td>{{ form.totalAmount }}</td>
+          <td>{{ form.status }}</td>
+          <td>{{ form.createdDate | date: 'short' }}</td>
+          <td>{{ form.rejectionReason || '-' }}</td>
+          <td><button (click)="editForm(form)" *ngIf="canEdit(form.status)">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

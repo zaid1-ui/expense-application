@@ -1,0 +1,53 @@
+<div class="dashboard">
+  <div class="header">
+    <h2>Manager Dashboard - {{ auth.getFullName() }}</h2>
+    <button (click)="logout()">Logout</button>
+  </div>
+
+  <p class="success" *ngIf="message">{{ message }}</p>
+  <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <div class="filters">
+    <input
+      type="text"
+      placeholder="Filter by employee name"
+      [(ngModel)]="filterEmployee"
+      (input)="loadForms()"
+    />
+    <select [(ngModel)]="filterCurrency" (change)="loadForms()">
+      <option value="">All Currencies</option>
+      <option value="PKR">PKR</option>
+      <option value="USD">USD</option>
+      <option value="EUR">EUR</option>
+    </select>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Employee</th>
+        <th>Currency</th>
+        <th>Total</th>
+        <th>Date</th>
+        <th>Reason (if requesting change)</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let form of forms">
+        <td>{{ form.id }}</td>
+        <td>{{ form.employeeName }}</td>
+        <td>{{ form.currency }}</td>
+        <td>{{ form.totalAmount }}</td>
+        <td>{{ form.createdDate | date: 'short' }}</td>
+        <td><input type="text" [(ngModel)]="reasonInputs[form.id]" placeholder="Reason..." /></td>
+        <td>
+          <button (click)="approve(form.id)">Approve</button>
+          <button (click)="requestChange(form.id)">Request Change</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p *ngIf="forms.length === 0">No forms awaiting approval.</p>
+</div>
