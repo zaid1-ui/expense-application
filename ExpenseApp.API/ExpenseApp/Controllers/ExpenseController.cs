@@ -1,11 +1,12 @@
+using System.Data;
+using System.Security.Claims;
+using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
-using ExpenseApp.Data;
+using ExpenseApp.Data.Rows;
 using ExpenseApp.DTOs;
 using ExpenseApp.Enums;
-using ExpenseApp.Models;
+using ExpenseApp.Services;
 
 namespace ExpenseApp.Controllers
 {
@@ -14,14 +15,14 @@ namespace ExpenseApp.Controllers
     [Authorize]
     public class ExpenseController : ControllerBase
     {
-        private readonly ExpenseAppDbContext _context;
+        private readonly DapperContext _dapper;
         private readonly ILogger<ExpenseController> _logger;
         private const decimal MaxExpenseAmount = 5000;
         private static readonly string[] AllowedCurrencies = { "PKR", "USD", "EUR", "TL", "INR" };
 
-        public ExpenseController(ExpenseAppDbContext context, ILogger<ExpenseController> logger)
+        public ExpenseController(DapperContext dapper, ILogger<ExpenseController> logger)
         {
-            _context = context;
+            _dapper = dapper;
             _logger = logger;
         }
 
@@ -79,37 +80,44 @@ namespace ExpenseApp.Controllers
                     return BadRequest(new { message = validationError });
 
                 var employeeId = GetUserId();
+                var now = DateTime.Now;
 
-                var form = new ExpenseForm
+                using var conn = _dapper.CreateConnection();
+                conn.Open();
+                using var transaction = conn.BeginTransaction();
+                try
                 {
-                    EmployeeId = employeeId,
-                    Currency = dto.Currency,
-                    Status = ExpenseStatus.PendingApproval,
-                    CreatedDate = DateTime.Now,
-                    SubmittedDate = DateTime.Now,
-                    ExpenseItems = dto.Items.Select(i => new ExpenseItem
+                    var formId = await conn.ExecuteScalarAsync<int>(
+                        "sp_InsertExpenseForm",
+                        new { EmployeeId = employeeId, dto.Currency, Status = (int)ExpenseStatus.PendingApproval, CreatedDate = now, SubmittedDate = now },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
+
+                    foreach (var item in dto.Items)
                     {
-                        ExpenseDate = i.ExpenseDate,
-                        Purpose = i.Purpose,
-                        Category = i.Category,
-                        Amount = i.Amount
-                    }).ToList()
-                };
+                        await conn.ExecuteAsync(
+                            "sp_InsertExpenseItem",
+                            new { ExpenseFormId = formId, item.ExpenseDate, Purpose = item.Purpose.Trim(), item.Category, item.Amount },
+                            transaction,
+                            commandType: CommandType.StoredProcedure);
+                    }
 
-                _context.ExpenseForms.Add(form);
-                await _context.SaveChangesAsync();
+                    await conn.ExecuteAsync(
+                        "sp_InsertApprovalHistory",
+                        new { ExpenseFormId = formId, ActionByUserId = employeeId, Action = "Submitted", Reason = (string?)null, ActionDate = now },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
 
-                _context.ApprovalHistories.Add(new ApprovalHistory
+                    transaction.Commit();
+
+                    _logger.LogInformation("Expense form {FormId} submitted by user {UserId}", formId, employeeId);
+                    return Ok(new { message = "Expense submitted successfully.", formId });
+                }
+                catch
                 {
-                    ExpenseFormId = form.Id,
-                    ActionByUserId = employeeId,
-                    Action = "Submitted",
-                    ActionDate = DateTime.Now
-                });
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Expense form {FormId} submitted by user {UserId}", form.Id, employeeId);
-                return Ok(new { message = "Expense submitted successfully.", formId = form.Id });
+                    transaction.Rollback();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -126,20 +134,18 @@ namespace ExpenseApp.Controllers
             try
             {
                 var employeeId = GetUserId();
-                var query = _context.ExpenseForms
-                    .Include(f => f.ExpenseItems)
-                    .Include(f => f.Employee)
-                    .Where(f => f.EmployeeId == employeeId);
+                int? statusInt = Enum.TryParse<ExpenseStatus>(status, out var parsedStatus) ? (int)parsedStatus : null;
 
-                if (!string.IsNullOrEmpty(status))
-                    query = query.Where(f => f.Status.ToString() == status);
+                using var conn = _dapper.CreateConnection();
+                using var multi = await conn.QueryMultipleAsync(
+                    "sp_GetMyForms",
+                    new { EmployeeId = employeeId, Status = statusInt, Currency = currency },
+                    commandType: CommandType.StoredProcedure);
 
-                if (!string.IsNullOrEmpty(currency))
-                    query = query.Where(f => f.Currency == currency);
+                var forms = (await multi.ReadAsync<FormRow>()).ToList();
+                var items = (await multi.ReadAsync<ItemRow>()).ToList();
 
-                var forms = await query.OrderByDescending(f => f.CreatedDate).ToListAsync();
-
-                return Ok(forms.Select(MapToDto).ToList());
+                return Ok(ExpenseMapper.ToDtoList(forms, items));
             }
             catch (Exception ex)
             {
@@ -155,34 +161,53 @@ namespace ExpenseApp.Controllers
             try
             {
                 var employeeId = GetUserId();
-                var form = await _context.ExpenseForms
-                    .Include(f => f.ExpenseItems)
-                    .FirstOrDefaultAsync(f => f.Id == id && f.EmployeeId == employeeId);
+
+                using var conn = _dapper.CreateConnection();
+                var form = await conn.QueryFirstOrDefaultAsync<FormRow>(
+                    "sp_GetExpenseFormForEdit",
+                    new { FormId = id, EmployeeId = employeeId },
+                    commandType: CommandType.StoredProcedure);
 
                 if (form == null)
                     return NotFound(new { message = "Expense form not found." });
 
-                if (form.Status != ExpenseStatus.PendingApproval && form.Status != ExpenseStatus.ChangeRequested)
+                var currentStatus = (ExpenseStatus)form.Status;
+                if (currentStatus != ExpenseStatus.PendingApproval && currentStatus != ExpenseStatus.ChangeRequested)
                     return BadRequest(new { message = "Only pending or change-requested forms can be edited." });
 
                 var validationError = ValidateExpenseForm(dto);
                 if (validationError != null)
                     return BadRequest(new { message = validationError });
 
-                _context.ExpenseItems.RemoveRange(form.ExpenseItems);
-                form.ExpenseItems = dto.Items.Select(i => new ExpenseItem
+                conn.Open();
+                using var transaction = conn.BeginTransaction();
+                try
                 {
-                    ExpenseDate = i.ExpenseDate,
-                    Purpose = i.Purpose,
-                    Category = i.Category,
-                    Amount = i.Amount
-                }).ToList();
+                    await conn.ExecuteAsync(
+                        "sp_DeleteExpenseItemsByForm", new { FormId = id }, transaction, commandType: CommandType.StoredProcedure);
 
-                form.Currency = dto.Currency;
-                form.Status = ExpenseStatus.PendingApproval;
-                form.RejectionReason = null;
+                    foreach (var item in dto.Items)
+                    {
+                        await conn.ExecuteAsync(
+                            "sp_InsertExpenseItem",
+                            new { ExpenseFormId = id, item.ExpenseDate, Purpose = item.Purpose.Trim(), item.Category, item.Amount },
+                            transaction,
+                            commandType: CommandType.StoredProcedure);
+                    }
 
-                await _context.SaveChangesAsync();
+                    await conn.ExecuteAsync(
+                        "sp_UpdateExpenseForm",
+                        new { FormId = id, dto.Currency, Status = (int)ExpenseStatus.PendingApproval, RejectionReason = (string?)null },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
 
                 _logger.LogInformation("Expense form {FormId} edited by user {UserId}", id, employeeId);
                 return Ok(new { message = "Expense updated successfully." });
@@ -205,19 +230,16 @@ namespace ExpenseApp.Controllers
             {
                 var managerId = GetUserId();
 
-                var query = _context.ExpenseForms
-                    .Include(f => f.ExpenseItems)
-                    .Include(f => f.Employee)
-                    .Where(f => f.Status == ExpenseStatus.PendingApproval && f.Employee.ManagerId == managerId);
+                using var conn = _dapper.CreateConnection();
+                using var multi = await conn.QueryMultipleAsync(
+                    "sp_GetAwaitingApproval",
+                    new { ManagerId = managerId, Currency = currency, EmployeeName = employeeName },
+                    commandType: CommandType.StoredProcedure);
 
-                if (!string.IsNullOrEmpty(currency))
-                    query = query.Where(f => f.Currency == currency);
+                var forms = (await multi.ReadAsync<FormRow>()).ToList();
+                var items = (await multi.ReadAsync<ItemRow>()).ToList();
 
-                if (!string.IsNullOrEmpty(employeeName))
-                    query = query.Where(f => f.Employee.FullName.Contains(employeeName));
-
-                var forms = await query.OrderByDescending(f => f.CreatedDate).ToListAsync();
-                return Ok(forms.Select(MapToDto).ToList());
+                return Ok(ExpenseMapper.ToDtoList(forms, items));
             }
             catch (Exception ex)
             {
@@ -233,25 +255,37 @@ namespace ExpenseApp.Controllers
             try
             {
                 var managerId = GetUserId();
-                var form = await _context.ExpenseForms
-                    .Include(f => f.Employee)
-                    .FirstOrDefaultAsync(f => f.Id == id);
+
+                using var conn = _dapper.CreateConnection();
+                var form = await conn.QueryFirstOrDefaultAsync<FormDetailRow>(
+                    "sp_GetExpenseFormById", new { FormId = id }, commandType: CommandType.StoredProcedure);
 
                 if (form == null) return NotFound(new { message = "Form not found." });
-                if (form.Employee.ManagerId != managerId) return Forbid();
-                if (form.Status != ExpenseStatus.PendingApproval)
+                if (form.EmployeeManagerId != managerId) return Forbid();
+                if ((ExpenseStatus)form.Status != ExpenseStatus.PendingApproval)
                     return BadRequest(new { message = "Only pending forms can be approved." });
 
-                form.Status = ExpenseStatus.Approved;
-                _context.ApprovalHistories.Add(new ApprovalHistory
+                conn.Open();
+                using var transaction = conn.BeginTransaction();
+                try
                 {
-                    ExpenseFormId = form.Id,
-                    ActionByUserId = managerId,
-                    Action = "Approved",
-                    ActionDate = DateTime.Now
-                });
+                    await conn.ExecuteAsync(
+                        "sp_ApproveForm", new { FormId = id }, transaction, commandType: CommandType.StoredProcedure);
 
-                await _context.SaveChangesAsync();
+                    await conn.ExecuteAsync(
+                        "sp_InsertApprovalHistory",
+                        new { ExpenseFormId = id, ActionByUserId = managerId, Action = "Approved", Reason = (string?)null, ActionDate = DateTime.Now },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+
                 _logger.LogInformation("Expense form {FormId} approved by manager {ManagerId}", id, managerId);
                 return Ok(new { message = "Expense form approved." });
             }
@@ -272,28 +306,37 @@ namespace ExpenseApp.Controllers
                     return BadRequest(new { message = "Reason is required to request a change." });
 
                 var managerId = GetUserId();
-                var form = await _context.ExpenseForms
-                    .Include(f => f.Employee)
-                    .FirstOrDefaultAsync(f => f.Id == id);
+
+                using var conn = _dapper.CreateConnection();
+                var form = await conn.QueryFirstOrDefaultAsync<FormDetailRow>(
+                    "sp_GetExpenseFormById", new { FormId = id }, commandType: CommandType.StoredProcedure);
 
                 if (form == null) return NotFound(new { message = "Form not found." });
-                if (form.Employee.ManagerId != managerId) return Forbid();
-                if (form.Status != ExpenseStatus.PendingApproval)
+                if (form.EmployeeManagerId != managerId) return Forbid();
+                if ((ExpenseStatus)form.Status != ExpenseStatus.PendingApproval)
                     return BadRequest(new { message = "Only pending forms can have changes requested." });
 
-                form.Status = ExpenseStatus.ChangeRequested;
-                form.RejectionReason = dto.Reason;
-
-                _context.ApprovalHistories.Add(new ApprovalHistory
+                conn.Open();
+                using var transaction = conn.BeginTransaction();
+                try
                 {
-                    ExpenseFormId = form.Id,
-                    ActionByUserId = managerId,
-                    Action = "ChangeRequested",
-                    Reason = dto.Reason,
-                    ActionDate = DateTime.Now
-                });
+                    await conn.ExecuteAsync(
+                        "sp_RequestChangeForm", new { FormId = id, dto.Reason }, transaction, commandType: CommandType.StoredProcedure);
 
-                await _context.SaveChangesAsync();
+                    await conn.ExecuteAsync(
+                        "sp_InsertApprovalHistory",
+                        new { ExpenseFormId = id, ActionByUserId = managerId, Action = "ChangeRequested", dto.Reason, ActionDate = DateTime.Now },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+
                 _logger.LogInformation("Change requested for form {FormId} by manager {ManagerId}", id, managerId);
                 return Ok(new { message = "Change requested. Employee has been notified." });
             }
@@ -313,19 +356,16 @@ namespace ExpenseApp.Controllers
         {
             try
             {
-                var query = _context.ExpenseForms
-                    .Include(f => f.ExpenseItems)
-                    .Include(f => f.Employee)
-                    .Where(f => f.Status == ExpenseStatus.Approved);
+                using var conn = _dapper.CreateConnection();
+                using var multi = await conn.QueryMultipleAsync(
+                    "sp_GetToBePaid",
+                    new { Currency = currency, EmployeeName = employeeName },
+                    commandType: CommandType.StoredProcedure);
 
-                if (!string.IsNullOrEmpty(currency))
-                    query = query.Where(f => f.Currency == currency);
+                var forms = (await multi.ReadAsync<FormRow>()).ToList();
+                var items = (await multi.ReadAsync<ItemRow>()).ToList();
 
-                if (!string.IsNullOrEmpty(employeeName))
-                    query = query.Where(f => f.Employee.FullName.Contains(employeeName));
-
-                var forms = await query.OrderByDescending(f => f.CreatedDate).ToListAsync();
-                return Ok(forms.Select(MapToDto).ToList());
+                return Ok(ExpenseMapper.ToDtoList(forms, items));
             }
             catch (Exception ex)
             {
@@ -341,23 +381,36 @@ namespace ExpenseApp.Controllers
             try
             {
                 var accountantId = GetUserId();
-                var form = await _context.ExpenseForms.FirstOrDefaultAsync(f => f.Id == id);
+
+                using var conn = _dapper.CreateConnection();
+                var form = await conn.QueryFirstOrDefaultAsync<FormDetailRow>(
+                    "sp_GetExpenseFormById", new { FormId = id }, commandType: CommandType.StoredProcedure);
 
                 if (form == null) return NotFound(new { message = "Form not found." });
-                if (form.Status != ExpenseStatus.Approved)
+                if ((ExpenseStatus)form.Status != ExpenseStatus.Approved)
                     return BadRequest(new { message = "Only approved forms can be paid." });
 
-                form.Status = ExpenseStatus.Paid;
-
-                _context.ApprovalHistories.Add(new ApprovalHistory
+                conn.Open();
+                using var transaction = conn.BeginTransaction();
+                try
                 {
-                    ExpenseFormId = form.Id,
-                    ActionByUserId = accountantId,
-                    Action = "Paid",
-                    ActionDate = DateTime.Now
-                });
+                    await conn.ExecuteAsync(
+                        "sp_PayForm", new { FormId = id }, transaction, commandType: CommandType.StoredProcedure);
 
-                await _context.SaveChangesAsync();
+                    await conn.ExecuteAsync(
+                        "sp_InsertApprovalHistory",
+                        new { ExpenseFormId = id, ActionByUserId = accountantId, Action = "Paid", Reason = (string?)null, ActionDate = DateTime.Now },
+                        transaction,
+                        commandType: CommandType.StoredProcedure);
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+
                 _logger.LogInformation("Expense form {FormId} paid by accountant {AccountantId}", id, accountantId);
                 return Ok(new { message = "Expense form marked as paid." });
             }
@@ -367,26 +420,6 @@ namespace ExpenseApp.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing payment." });
             }
         }
-
-        // ================= SHARED HELPER =================
-
-        private static ExpenseFormResponseDto MapToDto(ExpenseForm f) => new()
-        {
-            Id = f.Id,
-            EmployeeName = f.Employee?.FullName ?? "",
-            Currency = f.Currency,
-            Status = f.Status.ToString(),
-            TotalAmount = f.ExpenseItems.Sum(i => i.Amount),
-            CreatedDate = f.CreatedDate,
-            RejectionReason = f.RejectionReason,
-            Items = f.ExpenseItems.Select(i => new ExpenseItemDto
-            {
-                ExpenseDate = i.ExpenseDate,
-                Purpose = i.Purpose,
-                Category = i.Category,
-                Amount = i.Amount
-            }).ToList()
-        };
     }
 
     public class RejectDto

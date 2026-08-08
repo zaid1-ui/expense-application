@@ -1,7 +1,8 @@
+using System.Data;
 using System.Text.RegularExpressions;
+using Dapper;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ExpenseApp.Data;
+using ExpenseApp.Data.Rows;
 using ExpenseApp.DTOs;
 using ExpenseApp.Enums;
 using ExpenseApp.Models;
@@ -13,13 +14,13 @@ namespace ExpenseApp.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly ExpenseAppDbContext _context;
+        private readonly DapperContext _dapper;
         private readonly TokenService _tokenService;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(ExpenseAppDbContext context, TokenService tokenService, ILogger<AuthController> logger)
+        public AuthController(DapperContext dapper, TokenService tokenService, ILogger<AuthController> logger)
         {
-            _context = context;
+            _dapper = dapper;
             _tokenService = tokenService;
             _logger = logger;
         }
@@ -30,11 +31,9 @@ namespace ExpenseApp.Controllers
         [HttpGet("managers")]
         public async Task<ActionResult> GetManagers()
         {
-            var managers = await _context.Users
-                .Where(u => u.Role == UserRole.Manager)
-                .OrderBy(u => u.FullName)
-                .Select(u => new { u.Id, u.FullName })
-                .ToListAsync();
+            using var conn = _dapper.CreateConnection();
+            var managers = await conn.QueryAsync<ManagerRow>(
+                "sp_GetManagers", commandType: CommandType.StoredProcedure);
 
             return Ok(managers);
         }
@@ -66,28 +65,36 @@ namespace ExpenseApp.Controllers
                 if (request.Password.Length < 6)
                     return BadRequest(new { message = "Password must be at least 6 characters." });
 
-                var usernameTaken = await _context.Users.AnyAsync(u => u.Username == username);
+                using var conn = _dapper.CreateConnection();
+
+                var usernameTaken = await conn.ExecuteScalarAsync<bool>(
+                    "sp_UsernameExists",
+                    new { Username = username },
+                    commandType: CommandType.StoredProcedure);
                 if (usernameTaken)
                     return BadRequest(new { message = "That username is already taken." });
 
-                var manager = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Id == request.ManagerId && u.Role == UserRole.Manager);
+                var manager = await conn.QueryFirstOrDefaultAsync<ManagerRow>(
+                    "sp_GetManagerById",
+                    new { ManagerId = request.ManagerId },
+                    commandType: CommandType.StoredProcedure);
                 if (manager == null)
                     return BadRequest(new { message = "Please select a valid manager." });
 
-                var user = new User
-                {
-                    Username = username,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                    FullName = request.FullName.Trim(),
-                    Role = UserRole.Employee,
-                    ManagerId = manager.Id
-                };
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+                var newUserId = await conn.ExecuteScalarAsync<int>(
+                    "sp_InsertUser",
+                    new
+                    {
+                        Username = username,
+                        PasswordHash = passwordHash,
+                        FullName = request.FullName.Trim(),
+                        Role = (int)UserRole.Employee,
+                        ManagerId = manager.Id
+                    },
+                    commandType: CommandType.StoredProcedure);
 
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("New employee account registered: {Username}", user.Username);
+                _logger.LogInformation("New employee account registered: {Username} (Id {UserId})", username, newUserId);
                 return Ok(new { message = "Account created successfully. You can now log in." });
             }
             catch (Exception ex)
@@ -102,14 +109,25 @@ namespace ExpenseApp.Controllers
         {
             try
             {
-                var user = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Username == request.Username);
+                using var conn = _dapper.CreateConnection();
+                var userRow = await conn.QueryFirstOrDefaultAsync<UserRow>(
+                    "sp_GetUserByUsername",
+                    new { request.Username },
+                    commandType: CommandType.StoredProcedure);
 
-                if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+                if (userRow == null || !BCrypt.Net.BCrypt.Verify(request.Password, userRow.PasswordHash))
                 {
                     _logger.LogWarning("Failed login attempt for username {Username}", request.Username);
                     return Unauthorized(new { message = "Invalid username or password" });
                 }
+
+                var user = new User
+                {
+                    Id = userRow.Id,
+                    Username = userRow.Username,
+                    FullName = userRow.FullName,
+                    Role = (UserRole)userRow.Role
+                };
 
                 var token = _tokenService.GenerateToken(user);
 

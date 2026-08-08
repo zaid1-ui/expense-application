@@ -1,8 +1,9 @@
-using Microsoft.EntityFrameworkCore;
+using System.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using ExpenseApp.Data;
+using Dapper;
+using ExpenseApp.Services;
 using Serilog;
 
 // Logging: console for live viewing, plus a rolling daily file under Logs/ so
@@ -40,9 +41,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register DbContext with SQL Server
-builder.Services.AddDbContext<ExpenseAppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Data access: a raw SqlConnection factory for Dapper + stored procedures —
+// no ORM, no EF migrations. Schema lives in Database/InitialSetup.sql and
+// every query/write goes through Database/StoredProcedures.sql.
+builder.Services.AddSingleton<DapperContext>();
 
 // JWT Authentication setup
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -70,7 +72,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddScoped<ExpenseApp.Services.TokenService>();
+builder.Services.AddScoped<TokenService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -124,26 +126,28 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Schema and seed data are now owned by Database/InitialSetup.sql (run once,
-// directly against SQL Server), not by EF migrations — this just checks the
-// app can actually see that script's tables, rather than failing on the
-// first API call with a cryptic EF error deep in a controller.
+// Schema, seed data, and every query/write are now owned by the two scripts
+// under Database/ (run once, directly against SQL Server) — this just checks
+// the app can actually reach sp_GetUserCount, rather than failing on the
+// first real request with a cryptic error deep in a controller.
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ExpenseAppDbContext>();
+    var dapper = scope.ServiceProvider.GetRequiredService<DapperContext>();
     var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
-        if (!db.Users.Any())
+        using var conn = dapper.CreateConnection();
+        var userCount = await conn.ExecuteScalarAsync<int>("sp_GetUserCount", commandType: CommandType.StoredProcedure);
+        if (userCount == 0)
         {
             startupLogger.LogWarning(
-                "No users found in the database. Run Database/InitialSetup.sql against your SQL Server instance to create the schema and seed the test accounts.");
+                "No users found in the database. Run Database/InitialSetup.sql and Database/StoredProcedures.sql against your SQL Server instance.");
         }
     }
     catch (Exception ex)
     {
         startupLogger.LogError(ex,
-            "Could not reach the database. Check the connection string in appsettings.json and make sure Database/InitialSetup.sql has been run.");
+            "Could not reach the database or its stored procedures. Check the connection string in appsettings.json and make sure Database/InitialSetup.sql and Database/StoredProcedures.sql have been run.");
     }
 }
 

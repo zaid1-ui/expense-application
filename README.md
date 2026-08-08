@@ -4,7 +4,7 @@ A role-based expense management system built with **ASP.NET Core Web API**, **An
 
 ## Tech Stack
 
-- **Backend:** ASP.NET Core (.NET 8) Web API, Entity Framework Core (querying only — schema is hand-authored SQL, see `Database/InitialSetup.sql`)
+- **Backend:** ASP.NET Core (.NET 8) Web API, Dapper + stored procedures (no ORM/EF — schema and every query live in `Database/`)
 - **Database:** MSSQL Server
 - **Frontend:** Angular (latest, standalone components)
 - **Auth:** JWT (JSON Web Tokens)
@@ -24,7 +24,8 @@ Before running this project, make sure you have installed:
 ```
 ExpenseApplication/
 ├── Database/
-│   └── InitialSetup.sql     # Hand-written schema + seed data — run this against SQL Server
+│   ├── InitialSetup.sql       # Schema + seed data — run first
+│   └── StoredProcedures.sql   # Every query/write the backend performs — run second
 ├── ExpenseApp.API/
 │   └── ExpenseApp/          # .NET Web API backend
 ├── expense-app-frontend/    # Angular frontend
@@ -42,9 +43,14 @@ cd expense-application
 
 ### 2. Database Setup
 
-Schema and seed data are managed by a plain SQL script, not EF migrations — the app connects to an already-existing database and never creates or alters tables itself.
+Schema, seed data, and all data access are plain SQL — no EF migrations, no ORM. The backend calls stored procedures via Dapper for every read and write; it never generates or sends ad-hoc SQL text.
 
-Open `Database/InitialSetup.sql` in SSMS (or run it with `sqlcmd -S YOUR_SERVER_NAME -i Database/InitialSetup.sql`) against your SQL Server instance. It's idempotent — safe to run more than once — and creates the `ExpenseAppDB` database, all four tables with their constraints/indexes, and the 6 test accounts below.
+Run these two scripts **in order** against your SQL Server instance, either in SSMS or via `sqlcmd -S YOUR_SERVER_NAME -i <file>`:
+
+1. **`Database/InitialSetup.sql`** — creates the `ExpenseAppDB` database, all four tables with their constraints/indexes, and the 6 test accounts below.
+2. **`Database/StoredProcedures.sql`** — creates the ~24 stored procedures the backend calls (one per query/write: login, submit/edit expense, approve/reject, pay, admin reports, etc.).
+
+Both are idempotent — safe to re-run after making a change (table creation is `IF NOT EXISTS`-guarded, procedures use `CREATE OR ALTER`).
 
 ### 3. Backend Setup
 
@@ -75,7 +81,7 @@ dotnet run
 
 The API will start at `http://localhost:5053` (check your terminal output for the exact port). Swagger UI is available at `http://localhost:5053/swagger`.
 
-> On startup, the app checks it can see the `Users` table and logs a warning (to the console and `Logs/`) if it's empty or unreachable — that means `Database/InitialSetup.sql` hasn't been run yet, or the connection string is wrong.
+> On startup, the app calls `sp_GetUserCount` and logs a warning (to the console and `Logs/`) if it comes back empty or unreachable — that means one of the two SQL scripts hasn't been run yet, or the connection string is wrong. The app still starts either way; only requests that touch the database will fail until it's fixed.
 
 ### 4. Frontend Setup
 
@@ -156,5 +162,6 @@ Then open your browser at `http://localhost:4200`.
 
 - **CORS errors:** Make sure the backend is running and `Program.cs` has CORS configured for `http://localhost:4200`.
 - **Database connection errors:** Confirm your SQL Server instance name matches the connection string in `appsettings.json`, and that SQL Server Browser service is running if using a named instance (e.g. `SQLEXPRESS`).
-- **"No users found" warning on startup:** `Database/InitialSetup.sql` hasn't been run against the server your connection string points to — run it in SSMS or via `sqlcmd`.
+- **"No users found" / "Could not reach the database" warning on startup:** run `Database/InitialSetup.sql` then `Database/StoredProcedures.sql` against the server your connection string points to.
+- **"Could not find stored procedure 'sp_...'" errors while using the app:** `Database/StoredProcedures.sql` hasn't been run, or was run against a different database than the one in your connection string.
 - **"Zone.js" errors in Angular:** Run `npm install zone.js` inside the `expense-app-frontend` folder.
