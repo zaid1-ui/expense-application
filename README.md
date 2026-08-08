@@ -4,7 +4,7 @@ A role-based expense management system built with **ASP.NET Core Web API**, **An
 
 ## Tech Stack
 
-- **Backend:** ASP.NET Core (.NET 8) Web API, Entity Framework Core
+- **Backend:** ASP.NET Core (.NET 8) Web API, Entity Framework Core (querying only — schema is hand-authored SQL, see `Database/InitialSetup.sql`)
 - **Database:** MSSQL Server
 - **Frontend:** Angular (latest, standalone components)
 - **Auth:** JWT (JSON Web Tokens)
@@ -23,6 +23,8 @@ Before running this project, make sure you have installed:
 
 ```
 ExpenseApplication/
+├── Database/
+│   └── InitialSetup.sql     # Hand-written schema + seed data — run this against SQL Server
 ├── ExpenseApp.API/
 │   └── ExpenseApp/          # .NET Web API backend
 ├── expense-app-frontend/    # Angular frontend
@@ -38,7 +40,13 @@ git clone https://github.com/zaid1-ui/expense-application.git
 cd expense-application
 ```
 
-### 2. Backend Setup
+### 2. Database Setup
+
+Schema and seed data are managed by a plain SQL script, not EF migrations — the app connects to an already-existing database and never creates or alters tables itself.
+
+Open `Database/InitialSetup.sql` in SSMS (or run it with `sqlcmd -S YOUR_SERVER_NAME -i Database/InitialSetup.sql`) against your SQL Server instance. It's idempotent — safe to run more than once — and creates the `ExpenseAppDB` database, all four tables with their constraints/indexes, and the 6 test accounts below.
+
+### 3. Backend Setup
 
 Navigate to the backend project:
 
@@ -58,24 +66,18 @@ Open `appsettings.json` and update the connection string with your SQL Server in
 
 > To find your SQL Server instance name, open SSMS and check the "Server name" shown on the connect screen (e.g. `localhost`, `localhost\SQLEXPRESS`, or `YOUR-PC\SQLEXPRESS`).
 
-**Restore packages and run migrations:**
+**Restore packages and run:**
 
 ```bash
 dotnet restore
-dotnet ef database update
-```
-
-**Run the backend:**
-
-```bash
 dotnet run
 ```
 
 The API will start at `http://localhost:5053` (check your terminal output for the exact port). Swagger UI is available at `http://localhost:5053/swagger`.
 
-> On first run, the app automatically seeds 6 test users into the database (see [Test Accounts](#test-accounts) below).
+> On startup, the app checks it can see the `Users` table and logs a warning (to the console and `Logs/`) if it's empty or unreachable — that means `Database/InitialSetup.sql` hasn't been run yet, or the connection string is wrong.
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 
 Open a **new terminal**, navigate to the frontend project:
 
@@ -101,7 +103,7 @@ The app will be available at `http://localhost:4200`.
 
 ## Test Accounts
 
-The database is seeded automatically with the following users on first run:
+`Database/InitialSetup.sql` seeds the following users:
 
 | Username      | Password         | Role                           |
 | ------------- | ---------------- | ------------------------------ |
@@ -154,4 +156,5 @@ Then open your browser at `http://localhost:4200`.
 
 - **CORS errors:** Make sure the backend is running and `Program.cs` has CORS configured for `http://localhost:4200`.
 - **Database connection errors:** Confirm your SQL Server instance name matches the connection string in `appsettings.json`, and that SQL Server Browser service is running if using a named instance (e.g. `SQLEXPRESS`).
+- **"No users found" warning on startup:** `Database/InitialSetup.sql` hasn't been run against the server your connection string points to — run it in SSMS or via `sqlcmd`.
 - **"Zone.js" errors in Angular:** Run `npm install zone.js` inside the `expense-app-frontend` folder.

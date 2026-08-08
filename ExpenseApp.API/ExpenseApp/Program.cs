@@ -124,67 +124,26 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Seed data
+// Schema and seed data are now owned by Database/InitialSetup.sql (run once,
+// directly against SQL Server), not by EF migrations — this just checks the
+// app can actually see that script's tables, rather than failing on the
+// first API call with a cryptic EF error deep in a controller.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ExpenseAppDbContext>();
-    db.Database.Migrate();
-
-    if (!db.Users.Any())
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
     {
-        var manager1 = new ExpenseApp.Models.User
+        if (!db.Users.Any())
         {
-            Username = "manager1",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Manager@123"),
-            FullName = "Ali Manager",
-            Role = ExpenseApp.Enums.UserRole.Manager
-        };
-        var manager2 = new ExpenseApp.Models.User
-        {
-            Username = "manager2",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Manager@123"),
-            FullName = "Sara Manager",
-            Role = ExpenseApp.Enums.UserRole.Manager
-        };
-
-        db.Users.AddRange(manager1, manager2);
-        db.SaveChanges();
-
-        var employee1 = new ExpenseApp.Models.User
-        {
-            Username = "employee1",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Employee@123"),
-            FullName = "Zaid Employee",
-            Role = ExpenseApp.Enums.UserRole.Employee,
-            ManagerId = manager1.Id
-        };
-        var employee2 = new ExpenseApp.Models.User
-        {
-            Username = "employee2",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Employee@123"),
-            FullName = "Bilal Employee",
-            Role = ExpenseApp.Enums.UserRole.Employee,
-            ManagerId = manager2.Id
-        };
-
-        var accountant = new ExpenseApp.Models.User
-        {
-            Username = "accountant1",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Accountant@123"),
-            FullName = "Hina Accountant",
-            Role = ExpenseApp.Enums.UserRole.Accountant
-        };
-
-        var admin = new ExpenseApp.Models.User
-        {
-            Username = "admin1",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
-            FullName = "Admin User",
-            Role = ExpenseApp.Enums.UserRole.Admin
-        };
-
-        db.Users.AddRange(employee1, employee2, accountant, admin);
-        db.SaveChanges();
+            startupLogger.LogWarning(
+                "No users found in the database. Run Database/InitialSetup.sql against your SQL Server instance to create the schema and seed the test accounts.");
+        }
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogError(ex,
+            "Could not reach the database. Check the connection string in appsettings.json and make sure Database/InitialSetup.sql has been run.");
     }
 }
 
