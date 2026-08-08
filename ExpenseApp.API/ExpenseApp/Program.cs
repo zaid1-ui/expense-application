@@ -3,16 +3,31 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using ExpenseApp.Data;
+using Serilog;
+
+// Logging: console for live viewing, plus a rolling daily file under Logs/ so
+// errors are still reviewable after the terminal is closed — the console-only
+// setup this replaced lost everything on restart.
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        "Logs/expenseapp-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .CreateLogger();
+
+try
+{
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddControllers();
-
-// Logging
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddDebug();
 
 // CORS - allow Angular frontend
 builder.Services.AddCors(options =>
@@ -87,6 +102,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Logs every request's method/path/status/duration to both console and file —
+// catches failures (5xx, unhandled exceptions) even on endpoints that don't
+// log anything themselves.
+app.UseSerilogRequestLogging();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -189,6 +209,16 @@ app.MapGet("/weatherforecast", () =>
 .WithOpenApi();
 
 app.Run();
+
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly during startup");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {

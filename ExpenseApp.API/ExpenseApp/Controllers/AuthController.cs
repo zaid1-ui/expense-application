@@ -100,24 +100,34 @@ namespace ExpenseApp.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<LoginResponseDto>> Login(LoginRequestDto request)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
-
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            try
             {
-                return Unauthorized(new { message = "Invalid username or password" });
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Username == request.Username);
+
+                if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+                {
+                    _logger.LogWarning("Failed login attempt for username {Username}", request.Username);
+                    return Unauthorized(new { message = "Invalid username or password" });
+                }
+
+                var token = _tokenService.GenerateToken(user);
+
+                _logger.LogInformation("User {Username} ({Role}) logged in", user.Username, user.Role);
+                return Ok(new LoginResponseDto
+                {
+                    Token = token,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Role = user.Role.ToString(),
+                    UserId = user.Id
+                });
             }
-
-            var token = _tokenService.GenerateToken(user);
-
-            return Ok(new LoginResponseDto
+            catch (Exception ex)
             {
-                Token = token,
-                Username = user.Username,
-                FullName = user.FullName,
-                Role = user.Role.ToString(),
-                UserId = user.Id
-            });
+                _logger.LogError(ex, "Error during login for username {Username}", request.Username);
+                return StatusCode(500, new { message = "An error occurred while logging in." });
+            }
         }
     }
 }

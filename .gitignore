@@ -3,6 +3,7 @@
 **/obj/
 **/appsettings.Development.json
 *.user
+**/Logs/
 
 # Angular
 **/node_modules/
