@@ -10,6 +10,17 @@
   <p class="success" *ngIf="message">{{ message }}</p>
   <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
+  <div class="stats-row" *ngIf="forms.length > 0">
+    <div class="stat-tile">
+      <div class="stat-value">{{ forms.length }}</div>
+      <div class="stat-label">Awaiting Approval</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ employeeCount }}</div>
+      <div class="stat-label">Employees</div>
+    </div>
+  </div>
+
   <div class="section-card">
   <h3>Expenses Awaiting Approval</h3>
 

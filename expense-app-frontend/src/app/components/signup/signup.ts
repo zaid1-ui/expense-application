@@ -24,6 +24,8 @@ export class Signup implements OnInit {
   errorMessage = '';
   submitting = false;
   submitAttempted = false;
+  showPassword = false;
+  showConfirmPassword = false;
 
   constructor(
     private auth: Auth,
@@ -66,6 +68,14 @@ export class Signup implements OnInit {
     if (this.passwordInvalid) return 'Password must be at least 6 characters.';
     if (this.confirmPasswordInvalid) return 'Passwords do not match.';
     return null;
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
+  }
+
+  toggleConfirmPasswordVisibility(): void {
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
 
   onSubmit(): void {

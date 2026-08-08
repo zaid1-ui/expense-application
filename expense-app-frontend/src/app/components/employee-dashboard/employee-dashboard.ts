@@ -45,6 +45,22 @@ export class EmployeeDashboard implements OnInit {
     return this.items.reduce((sum, i) => sum + Number(i.amount || 0), 0);
   }
 
+  get pendingCount(): number {
+    return this.forms.filter((f) => f.status === 'PendingApproval').length;
+  }
+
+  get changeRequestedCount(): number {
+    return this.forms.filter((f) => f.status === 'ChangeRequested').length;
+  }
+
+  get approvedCount(): number {
+    return this.forms.filter((f) => f.status === 'Approved').length;
+  }
+
+  get paidCount(): number {
+    return this.forms.filter((f) => f.status === 'Paid').length;
+  }
+
   addItem(): void {
     this.items.push(EMPTY_ITEM());
   }

@@ -141,6 +141,43 @@ select:focus {
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
+/* ---- Password field with show/hide toggle ---- */
+.password-field {
+  position: relative;
+}
+.password-field input {
+  width: 100%;
+  padding-right: 38px;
+}
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.password-toggle:hover {
+  color: var(--color-primary);
+  border-color: transparent;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+}
+.password-toggle:active {
+  transform: translateY(-50%);
+}
+.password-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+
 /* Applied when a field fails validation after a submit attempt */
 .field-invalid,
 input.field-invalid,
@@ -228,6 +265,65 @@ tbody tr:hover {
   color: var(--color-success);
 }
 
+/* Success/error banners — colors are set per-page, this adds the icon and
+   a gentle entrance so they don't just pop into existence. */
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.success,
+.error {
+  animation: messageIn 0.2s ease-out;
+}
+.success::before {
+  content: '✓  ';
+}
+.error::before {
+  content: '⚠  ';
+}
+
+/* ---- Quick-glance stat tiles (top of each dashboard) ---- */
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.stat-tile {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  min-width: 120px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.stat-tile:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.stat-tile .stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+.stat-tile .stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
 ::selection {
   background: var(--color-primary-soft);
 }
@@ -289,6 +385,10 @@ tbody tr:hover {
   width: 100%;
   margin-top: 6px;
   padding: 10px 12px;
+}
+
+.auth-card form .password-field input {
+  padding-right: 38px;
 }
 
 .auth-card form button[type='submit'] {

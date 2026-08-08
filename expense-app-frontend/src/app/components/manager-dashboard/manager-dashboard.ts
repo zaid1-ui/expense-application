@@ -46,6 +46,10 @@ export class ManagerDashboard implements OnInit {
     });
   }
 
+  get employeeCount(): number {
+    return new Set(this.forms.map((f) => f.employeeName)).size;
+  }
+
   toggleDetails(id: number): void {
     this.expandedFormId = this.expandedFormId === id ? null : id;
   }

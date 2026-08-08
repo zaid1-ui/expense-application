@@ -17,11 +17,16 @@ export class Login {
   errorMessage = '';
   submitting = false;
   submitAttempted = false;
+  showPassword = false;
 
   constructor(
     private auth: Auth,
     private router: Router,
   ) {}
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
+  }
 
   onSubmit(): void {
     this.errorMessage = '';

@@ -36,6 +36,10 @@ export class AdminDashboard implements OnInit {
     this.loadTransactions();
   }
 
+  get transactionEmployeeCount(): number {
+    return new Set(this.transactions.map((t) => t.employeeName)).size;
+  }
+
   setTab(tab: 'transactions' | 'history' | 'reports'): void {
     this.activeTab = tab;
     if (tab === 'transactions') this.loadTransactions();
