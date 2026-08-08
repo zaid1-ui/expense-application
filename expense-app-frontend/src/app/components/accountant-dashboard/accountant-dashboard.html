@@ -28,57 +28,61 @@
     </select>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Employee</th>
-        <th>Currency</th>
-        <th>Total</th>
-        <th>Date</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      <ng-container *ngFor="let form of forms">
+  <div class="table-wrap">
+    <table>
+      <thead>
         <tr>
-          <td>{{ form.id }}</td>
-          <td>{{ form.employeeName }}</td>
-          <td>{{ form.currency }}</td>
-          <td>{{ form.totalAmount }}</td>
-          <td>{{ form.createdDate | date: 'short' }}</td>
-          <td class="actions-cell">
-            <button (click)="toggleDetails(form.id)">
-              {{ expandedFormId === form.id ? 'Hide Details' : 'View Details' }}
-            </button>
-            <button class="btn-primary" (click)="pay(form.id)">Mark as Paid</button>
-          </td>
+          <th>ID</th>
+          <th>Employee</th>
+          <th>Currency</th>
+          <th>Total</th>
+          <th>Date</th>
+          <th>Action</th>
         </tr>
-        <tr *ngIf="expandedFormId === form.id">
-          <td colspan="6">
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Purpose</th>
-                  <th>Category</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let item of form.items">
-                  <td>{{ item.expenseDate | date: 'shortDate' }}</td>
-                  <td>{{ item.purpose }}</td>
-                  <td>{{ item.category }}</td>
-                  <td>{{ item.amount }} {{ form.currency }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </td>
-        </tr>
-      </ng-container>
-    </tbody>
-  </table>
-  <p *ngIf="forms.length === 0">No expenses awaiting payment.</p>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let form of forms">
+          <tr>
+            <td>{{ form.id }}</td>
+            <td>{{ form.employeeName }}</td>
+            <td>{{ form.currency }}</td>
+            <td>{{ form.totalAmount }}</td>
+            <td>{{ form.createdDate | date: 'short' }}</td>
+            <td class="actions-cell">
+              <button (click)="toggleDetails(form.id)">
+                {{ expandedFormId === form.id ? 'Hide Details' : 'View Details' }}
+              </button>
+              <button class="btn-primary" [disabled]="isBusy(form.id)" (click)="pay(form.id)">
+                {{ isBusy(form.id) ? 'Processing…' : 'Mark as Paid' }}
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="expandedFormId === form.id">
+            <td colspan="6">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Purpose</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of form.items">
+                    <td>{{ item.expenseDate | date: 'shortDate' }}</td>
+                    <td>{{ item.purpose }}</td>
+                    <td>{{ item.category }}</td>
+                    <td>{{ item.amount }} {{ form.currency }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+  <p class="empty-state" *ngIf="!loading && forms.length === 0">No expenses awaiting payment.</p>
   </div>
 </div>

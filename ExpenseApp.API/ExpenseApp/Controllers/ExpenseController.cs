@@ -17,6 +17,7 @@ namespace ExpenseApp.Controllers
         private readonly ExpenseAppDbContext _context;
         private readonly ILogger<ExpenseController> _logger;
         private const decimal MaxExpenseAmount = 5000;
+        private static readonly string[] AllowedCurrencies = { "PKR", "USD", "EUR", "TL", "INR" };
 
         public ExpenseController(ExpenseAppDbContext context, ILogger<ExpenseController> logger)
         {
@@ -27,6 +28,44 @@ namespace ExpenseApp.Controllers
         private int GetUserId() =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // Single source of truth for what makes a submitted/edited form valid —
+        // the frontend mirrors these rules for UX, but this is what actually
+        // decides what lands in the database.
+        private static string? ValidateExpenseForm(ExpenseFormCreateDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Currency) || !AllowedCurrencies.Contains(dto.Currency))
+                return $"Currency must be one of: {string.Join(", ", AllowedCurrencies)}.";
+
+            if (dto.Items == null || dto.Items.Count == 0)
+                return "Expense form must have at least one expense item.";
+
+            foreach (var item in dto.Items)
+            {
+                if (string.IsNullOrWhiteSpace(item.Purpose))
+                    return "Purpose is required for every expense item.";
+
+                if (item.Purpose.Trim().Length > 200)
+                    return "Purpose must be 200 characters or fewer.";
+
+                if (string.IsNullOrWhiteSpace(item.Category))
+                    return "Category is required for every expense item.";
+
+                if (item.ExpenseDate == default)
+                    return "Expense date is required for every expense item.";
+
+                if (item.ExpenseDate.Date > DateTime.Now.Date)
+                    return "Expense date cannot be in the future.";
+
+                if (item.Amount <= 0)
+                    return "Expense amount must be greater than 0.";
+
+                if (item.Amount > MaxExpenseAmount)
+                    return $"Expense amount cannot exceed {MaxExpenseAmount}.";
+            }
+
+            return null;
+        }
+
         // ================= EMPLOYEE =================
 
         [HttpPost]
@@ -35,14 +74,9 @@ namespace ExpenseApp.Controllers
         {
             try
             {
-                if (dto.Items == null || dto.Items.Count == 0)
-                    return BadRequest(new { message = "Expense form must have at least one expense item." });
-
-                foreach (var item in dto.Items)
-                {
-                    if (item.Amount > MaxExpenseAmount)
-                        return BadRequest(new { message = $"Expense amount cannot exceed {MaxExpenseAmount}." });
-                }
+                var validationError = ValidateExpenseForm(dto);
+                if (validationError != null)
+                    return BadRequest(new { message = validationError });
 
                 var employeeId = GetUserId();
 
@@ -131,11 +165,9 @@ namespace ExpenseApp.Controllers
                 if (form.Status != ExpenseStatus.PendingApproval && form.Status != ExpenseStatus.ChangeRequested)
                     return BadRequest(new { message = "Only pending or change-requested forms can be edited." });
 
-                foreach (var item in dto.Items)
-                {
-                    if (item.Amount > MaxExpenseAmount)
-                        return BadRequest(new { message = $"Expense amount cannot exceed {MaxExpenseAmount}." });
-                }
+                var validationError = ValidateExpenseForm(dto);
+                if (validationError != null)
+                    return BadRequest(new { message = validationError });
 
                 _context.ExpenseItems.RemoveRange(form.ExpenseItems);
                 form.ExpenseItems = dto.Items.Select(i => new ExpenseItem

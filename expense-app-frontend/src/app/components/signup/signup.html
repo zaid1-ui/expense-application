@@ -7,15 +7,39 @@
     <form (ngSubmit)="onSubmit()">
       <label>
         Full name
-        <input type="text" [(ngModel)]="fullName" name="fullName" required autocomplete="name" />
+        <input
+          type="text"
+          [(ngModel)]="fullName"
+          name="fullName"
+          required
+          maxlength="100"
+          autocomplete="name"
+          [class.field-invalid]="submitAttempted && fullNameInvalid"
+        />
       </label>
       <label>
         Username
-        <input type="text" [(ngModel)]="username" name="username" required autocomplete="username" />
+        <input
+          type="text"
+          [(ngModel)]="username"
+          name="username"
+          required
+          minlength="3"
+          maxlength="20"
+          pattern="[a-zA-Z0-9_]+"
+          autocomplete="username"
+          [class.field-invalid]="submitAttempted && usernameInvalid"
+        />
+        <span class="field-hint">3-20 characters: letters, numbers, underscores.</span>
       </label>
       <label>
         Manager
-        <select [(ngModel)]="managerId" name="managerId" required>
+        <select
+          [(ngModel)]="managerId"
+          name="managerId"
+          required
+          [class.field-invalid]="submitAttempted && managerInvalid"
+        >
           <option [ngValue]="null" disabled>Select your manager</option>
           <option *ngFor="let m of managers" [ngValue]="m.id">{{ m.fullName }}</option>
         </select>
@@ -29,6 +53,7 @@
           required
           minlength="6"
           autocomplete="new-password"
+          [class.field-invalid]="submitAttempted && passwordInvalid"
         />
       </label>
       <label>
@@ -39,6 +64,7 @@
           name="confirmPassword"
           required
           autocomplete="new-password"
+          [class.field-invalid]="submitAttempted && confirmPasswordInvalid"
         />
       </label>
 

@@ -22,38 +22,75 @@
       <option value="INR">INR</option>
     </select>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Purpose</th>
-          <th>Category</th>
-          <th>Amount</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of items; let i = index">
-          <td><input type="date" [(ngModel)]="item.expenseDate" [name]="'date' + i" /></td>
-          <td><input type="text" [(ngModel)]="item.purpose" [name]="'purpose' + i" /></td>
-          <td><input type="text" [(ngModel)]="item.category" [name]="'category' + i" /></td>
-          <td>
-            <input type="number" [(ngModel)]="item.amount" [name]="'amount' + i" max="5000" />
-          </td>
-          <td>
-            <button class="btn-danger" (click)="removeItem(i)" *ngIf="items.length > 1">Remove</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Purpose</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of items; let i = index">
+            <td>
+              <input
+                type="date"
+                [(ngModel)]="item.expenseDate"
+                [name]="'date' + i"
+                [max]="today"
+                [class.field-invalid]="submitAttempted && isDateInvalid(item)"
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                [(ngModel)]="item.purpose"
+                [name]="'purpose' + i"
+                placeholder="e.g. Client dinner"
+                maxlength="200"
+                [class.field-invalid]="submitAttempted && isPurposeInvalid(item)"
+              />
+            </td>
+            <td>
+              <select
+                [(ngModel)]="item.category"
+                [name]="'category' + i"
+                [class.field-invalid]="submitAttempted && isCategoryInvalid(item)"
+              >
+                <option value="" disabled>Select category</option>
+                <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+              </select>
+            </td>
+            <td>
+              <input
+                type="number"
+                [(ngModel)]="item.amount"
+                [name]="'amount' + i"
+                min="0.01"
+                step="0.01"
+                [max]="maxAmount"
+                [class.field-invalid]="submitAttempted && isAmountInvalid(item)"
+              />
+            </td>
+            <td>
+              <button class="btn-danger" (click)="removeItem(i)" *ngIf="items.length > 1">Remove</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <button (click)="addItem()">+ Add Item</button>
     <p class="total-line">
       Total: <strong>{{ totalAmount }} {{ currency }}</strong>
+      <span class="hint">(max {{ maxAmount }} per item)</span>
     </p>
 
-    <button class="btn-primary" (click)="submitForm()">
-      {{ editingFormId ? 'Update' : 'Submit' }}
+    <button class="btn-primary" (click)="submitForm()" [disabled]="submitting">
+      {{ submitting ? 'Saving…' : editingFormId ? 'Update' : 'Submit' }}
     </button>
     <button (click)="cancelEdit()" *ngIf="editingFormId">Cancel</button>
   </div>
@@ -77,29 +114,34 @@
       </select>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Currency</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Reason</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let form of forms">
-          <td>{{ form.id }}</td>
-          <td>{{ form.currency }}</td>
-          <td>{{ form.totalAmount }}</td>
-          <td><span [class]="statusClass(form.status)">{{ statusLabel(form.status) }}</span></td>
-          <td>{{ form.createdDate | date: 'short' }}</td>
-          <td>{{ form.rejectionReason || '-' }}</td>
-          <td><button (click)="editForm(form)" *ngIf="canEdit(form.status)">Edit</button></td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Currency</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Reason</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let form of forms">
+            <td>{{ form.id }}</td>
+            <td>{{ form.currency }}</td>
+            <td>{{ form.totalAmount }}</td>
+            <td><span [class]="statusClass(form.status)">{{ statusLabel(form.status) }}</span></td>
+            <td>{{ form.createdDate | date: 'short' }}</td>
+            <td>{{ form.rejectionReason || '-' }}</td>
+            <td><button (click)="editForm(form)" *ngIf="canEdit(form.status)">Edit</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="empty-state" *ngIf="!loading && forms.length === 0">
+      No expense forms yet — submit one above to get started.
+    </p>
   </div>
 </div>

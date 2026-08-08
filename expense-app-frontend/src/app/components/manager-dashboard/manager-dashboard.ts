@@ -18,7 +18,10 @@ export class ManagerDashboard implements OnInit {
   message = '';
   errorMessage = '';
   reasonInputs: { [id: number]: string } = {};
+  reasonMissing: { [id: number]: boolean } = {};
   expandedFormId: number | null = null;
+  loading = false;
+  busyIds = new Set<number>();
 
   constructor(
     private expenseService: Expense,
@@ -30,9 +33,16 @@ export class ManagerDashboard implements OnInit {
   }
 
   loadForms(): void {
+    this.loading = true;
     this.expenseService.getAwaitingApproval(this.filterCurrency, this.filterEmployee).subscribe({
-      next: (data) => (this.forms = data),
-      error: () => (this.errorMessage = 'Failed to load forms.'),
+      next: (data) => {
+        this.forms = data;
+        this.loading = false;
+      },
+      error: () => {
+        this.errorMessage = 'Failed to load forms.';
+        this.loading = false;
+      },
     });
   }
 
@@ -40,28 +50,50 @@ export class ManagerDashboard implements OnInit {
     this.expandedFormId = this.expandedFormId === id ? null : id;
   }
 
+  isBusy(id: number): boolean {
+    return this.busyIds.has(id);
+  }
+
   approve(id: number): void {
+    if (this.isBusy(id)) return;
+    this.errorMessage = '';
+    this.busyIds.add(id);
     this.expenseService.approveForm(id).subscribe({
       next: () => {
         this.message = 'Form approved.';
+        this.busyIds.delete(id);
         this.loadForms();
       },
-      error: (err) => (this.errorMessage = err.error?.message || 'Approval failed.'),
+      error: (err) => {
+        this.busyIds.delete(id);
+        this.errorMessage = err.error?.message || 'Approval failed.';
+      },
     });
   }
 
   requestChange(id: number): void {
-    const reason = this.reasonInputs[id];
-    if (!reason || !reason.trim()) {
+    if (this.isBusy(id)) return;
+    this.errorMessage = '';
+    const reason = (this.reasonInputs[id] || '').trim();
+
+    if (!reason) {
+      this.reasonMissing[id] = true;
       this.errorMessage = 'Reason is required to request a change.';
       return;
     }
+    this.reasonMissing[id] = false;
+
+    this.busyIds.add(id);
     this.expenseService.requestChange(id, reason).subscribe({
       next: () => {
         this.message = 'Change requested.';
+        this.busyIds.delete(id);
         this.loadForms();
       },
-      error: (err) => (this.errorMessage = err.error?.message || 'Request failed.'),
+      error: (err) => {
+        this.busyIds.delete(id);
+        this.errorMessage = err.error?.message || 'Request failed.';
+      },
     });
   }
 

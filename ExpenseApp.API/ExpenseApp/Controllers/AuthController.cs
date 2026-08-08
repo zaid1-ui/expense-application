@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ExpenseApp.Data;
@@ -50,10 +51,22 @@ namespace ExpenseApp.Controllers
                     return BadRequest(new { message = "Username, password, and full name are required." });
                 }
 
+                var username = request.Username.Trim();
+                if (!Regex.IsMatch(username, "^[a-zA-Z0-9_]{3,20}$"))
+                {
+                    return BadRequest(new
+                    {
+                        message = "Username must be 3-20 characters and contain only letters, numbers, and underscores."
+                    });
+                }
+
+                if (request.FullName.Trim().Length < 2)
+                    return BadRequest(new { message = "Please enter your full name." });
+
                 if (request.Password.Length < 6)
                     return BadRequest(new { message = "Password must be at least 6 characters." });
 
-                var usernameTaken = await _context.Users.AnyAsync(u => u.Username == request.Username);
+                var usernameTaken = await _context.Users.AnyAsync(u => u.Username == username);
                 if (usernameTaken)
                     return BadRequest(new { message = "That username is already taken." });
 
@@ -64,9 +77,9 @@ namespace ExpenseApp.Controllers
 
                 var user = new User
                 {
-                    Username = request.Username,
+                    Username = username,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                    FullName = request.FullName,
+                    FullName = request.FullName.Trim(),
                     Role = UserRole.Employee,
                     ManagerId = manager.Id
                 };
