@@ -1,6 +1,9 @@
 <div class="dashboard">
   <div class="header">
-    <h2>Employee Dashboard - {{ auth.getFullName() }}</h2>
+    <div>
+      <p class="role-eyebrow">Employee</p>
+      <h2>{{ auth.getFullName() }}</h2>
+    </div>
     <button (click)="logout()">Logout</button>
   </div>
 
@@ -37,17 +40,21 @@
           <td>
             <input type="number" [(ngModel)]="item.amount" [name]="'amount' + i" max="5000" />
           </td>
-          <td><button (click)="removeItem(i)" *ngIf="items.length > 1">Remove</button></td>
+          <td>
+            <button class="btn-danger" (click)="removeItem(i)" *ngIf="items.length > 1">Remove</button>
+          </td>
         </tr>
       </tbody>
     </table>
 
     <button (click)="addItem()">+ Add Item</button>
-    <p>
-      <strong>Total: {{ totalAmount }} {{ currency }}</strong>
+    <p class="total-line">
+      Total: <strong>{{ totalAmount }} {{ currency }}</strong>
     </p>
 
-    <button (click)="submitForm()">{{ editingFormId ? 'Update' : 'Submit' }}</button>
+    <button class="btn-primary" (click)="submitForm()">
+      {{ editingFormId ? 'Update' : 'Submit' }}
+    </button>
     <button (click)="cancelEdit()" *ngIf="editingFormId">Cancel</button>
   </div>
 
@@ -87,7 +94,7 @@
           <td>{{ form.id }}</td>
           <td>{{ form.currency }}</td>
           <td>{{ form.totalAmount }}</td>
-          <td>{{ form.status }}</td>
+          <td><span [class]="statusClass(form.status)">{{ statusLabel(form.status) }}</span></td>
           <td>{{ form.createdDate | date: 'short' }}</td>
           <td>{{ form.rejectionReason || '-' }}</td>
           <td><button (click)="editForm(form)" *ngIf="canEdit(form.status)">Edit</button></td>

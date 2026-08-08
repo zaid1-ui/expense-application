@@ -104,6 +104,18 @@ export class EmployeeDashboard implements OnInit {
     return status === 'PendingApproval' || status === 'ChangeRequested';
   }
 
+  statusLabel(status: string): string {
+    return status === 'PendingApproval'
+      ? 'Pending Approval'
+      : status === 'ChangeRequested'
+        ? 'Change Requested'
+        : status;
+  }
+
+  statusClass(status: string): string {
+    return 'status-badge status-' + status.toLowerCase();
+  }
+
   logout(): void {
     this.auth.logout();
   }

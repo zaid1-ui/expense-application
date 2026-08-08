@@ -1,0 +1,53 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <p class="auth-brand">Expense App</p>
+    <h2>Create your account</h2>
+    <p class="auth-sub">Employee signup — pick your manager and you're in.</p>
+
+    <form (ngSubmit)="onSubmit()">
+      <label>
+        Full name
+        <input type="text" [(ngModel)]="fullName" name="fullName" required autocomplete="name" />
+      </label>
+      <label>
+        Username
+        <input type="text" [(ngModel)]="username" name="username" required autocomplete="username" />
+      </label>
+      <label>
+        Manager
+        <select [(ngModel)]="managerId" name="managerId" required>
+          <option [ngValue]="null" disabled>Select your manager</option>
+          <option *ngFor="let m of managers" [ngValue]="m.id">{{ m.fullName }}</option>
+        </select>
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+        />
+      </label>
+      <label>
+        Confirm password
+        <input
+          type="password"
+          [(ngModel)]="confirmPassword"
+          name="confirmPassword"
+          required
+          autocomplete="new-password"
+        />
+      </label>
+
+      <button type="submit" [disabled]="submitting">
+        {{ submitting ? 'Creating account…' : 'Create account' }}
+      </button>
+      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+    </form>
+
+    <p class="auth-switch">Already have an account? <a routerLink="/login">Log in</a></p>
+  </div>
+</div>

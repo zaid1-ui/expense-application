@@ -1,15 +1,28 @@
-<div class="login-container">
-  <h2>Expense Application Login</h2>
-  <form (ngSubmit)="onSubmit()">
-    <div>
-      <label>Username</label>
-      <input type="text" [(ngModel)]="username" name="username" required />
-    </div>
-    <div>
-      <label>Password</label>
-      <input type="password" [(ngModel)]="password" name="password" required />
-    </div>
-    <button type="submit">Login</button>
-    <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-  </form>
+<div class="auth-page">
+  <div class="auth-card">
+    <p class="auth-brand">Expense App</p>
+    <h2>Welcome back</h2>
+    <p class="auth-sub">Log in to submit, approve, or process expenses.</p>
+
+    <form (ngSubmit)="onSubmit()">
+      <label>
+        Username
+        <input type="text" [(ngModel)]="username" name="username" required autocomplete="username" />
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          required
+          autocomplete="current-password"
+        />
+      </label>
+      <button type="submit">Log in</button>
+      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+    </form>
+
+    <p class="auth-switch">Employee, and don't have an account? <a routerLink="/signup">Sign up</a></p>
+  </div>
 </div>

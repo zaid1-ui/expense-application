@@ -1,12 +1,16 @@
 <div class="dashboard">
   <div class="header">
-    <h2>Manager Dashboard - {{ auth.getFullName() }}</h2>
+    <div>
+      <p class="role-eyebrow">Manager</p>
+      <h2>{{ auth.getFullName() }}</h2>
+    </div>
     <button (click)="logout()">Logout</button>
   </div>
 
   <p class="success" *ngIf="message">{{ message }}</p>
   <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
+  <div class="section-card">
   <h3>Expenses Awaiting Approval</h3>
 
   <div class="filters">
@@ -45,12 +49,12 @@
           <td>{{ form.totalAmount }}</td>
           <td>{{ form.createdDate | date: 'short' }}</td>
           <td><input type="text" [(ngModel)]="reasonInputs[form.id]" placeholder="Reason..." /></td>
-          <td>
+          <td class="actions-cell">
             <button (click)="toggleDetails(form.id)">
               {{ expandedFormId === form.id ? 'Hide Details' : 'View Details' }}
             </button>
-            <button (click)="approve(form.id)">Approve</button>
-            <button (click)="requestChange(form.id)">Request Change</button>
+            <button class="btn-primary" (click)="approve(form.id)">Approve</button>
+            <button class="btn-danger" (click)="requestChange(form.id)">Request Change</button>
           </td>
         </tr>
         <tr *ngIf="expandedFormId === form.id">
@@ -79,4 +83,5 @@
     </tbody>
   </table>
   <p *ngIf="forms.length === 0">No forms awaiting approval.</p>
+  </div>
 </div>

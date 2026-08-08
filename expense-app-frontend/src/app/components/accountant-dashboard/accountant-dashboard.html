@@ -1,12 +1,16 @@
 <div class="dashboard">
   <div class="header">
-    <h2>Accountant Dashboard - {{ auth.getFullName() }}</h2>
+    <div>
+      <p class="role-eyebrow">Accountant</p>
+      <h2>{{ auth.getFullName() }}</h2>
+    </div>
     <button (click)="logout()">Logout</button>
   </div>
 
   <p class="success" *ngIf="message">{{ message }}</p>
   <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
+  <div class="section-card">
   <h3>Expenses to be Paid</h3>
 
   <div class="filters">
@@ -43,11 +47,11 @@
           <td>{{ form.currency }}</td>
           <td>{{ form.totalAmount }}</td>
           <td>{{ form.createdDate | date: 'short' }}</td>
-          <td>
+          <td class="actions-cell">
             <button (click)="toggleDetails(form.id)">
               {{ expandedFormId === form.id ? 'Hide Details' : 'View Details' }}
             </button>
-            <button (click)="pay(form.id)">Mark as Paid</button>
+            <button class="btn-primary" (click)="pay(form.id)">Mark as Paid</button>
           </td>
         </tr>
         <tr *ngIf="expandedFormId === form.id">
@@ -76,4 +80,5 @@
     </tbody>
   </table>
   <p *ngIf="forms.length === 0">No expenses awaiting payment.</p>
+  </div>
 </div>

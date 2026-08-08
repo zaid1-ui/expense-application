@@ -66,6 +66,10 @@ export class AdminDashboard implements OnInit {
     this.expenseService.getMonthlyReport().subscribe((data) => (this.monthly = data));
   }
 
+  statusClass(status: string): string {
+    return 'status-badge status-' + status.toLowerCase();
+  }
+
   logout(): void {
     this.auth.logout();
   }

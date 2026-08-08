@@ -16,6 +16,18 @@ export interface LoginResponse {
   userId: number;
 }
 
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  fullName: string;
+  managerId: number;
+}
+
+export interface ManagerOption {
+  id: number;
+  fullName: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -36,6 +48,14 @@ export class Auth {
         localStorage.setItem('userId', response.userId.toString());
       }),
     );
+  }
+
+  getManagers(): Observable<ManagerOption[]> {
+    return this.http.get<ManagerOption[]>(`${this.apiUrl}/managers`);
+  }
+
+  register(data: RegisterRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/register`, data);
   }
 
   logout(): void {

@@ -1,6 +1,9 @@
 <div class="dashboard">
   <div class="header">
-    <h2>Admin Dashboard - {{ auth.getFullName() }}</h2>
+    <div>
+      <p class="role-eyebrow">Admin</p>
+      <h2>{{ auth.getFullName() }}</h2>
+    </div>
     <button (click)="logout()">Logout</button>
   </div>
 
@@ -17,7 +20,7 @@
   </div>
 
   <!-- Transactions Tab -->
-  <div *ngIf="activeTab === 'transactions'">
+  <div class="section-card" *ngIf="activeTab === 'transactions'">
     <div class="filters">
       <input
         type="text"
@@ -50,7 +53,7 @@
           <td>{{ t.employeeName }}</td>
           <td>{{ t.currency }}</td>
           <td>{{ t.totalAmount }}</td>
-          <td>{{ t.status }}</td>
+          <td><span [class]="statusClass(t.status)">{{ t.status }}</span></td>
           <td>{{ t.createdDate | date: 'short' }}</td>
         </tr>
       </tbody>
@@ -58,7 +61,7 @@
   </div>
 
   <!-- History Tab -->
-  <div *ngIf="activeTab === 'history'">
+  <div class="section-card" *ngIf="activeTab === 'history'">
     <div class="filters">
       <input
         type="text"
@@ -90,7 +93,7 @@
           <td>{{ h.expenseFormId }}</td>
           <td>{{ h.actionBy }}</td>
           <td>{{ h.actionByRole }}</td>
-          <td>{{ h.action }}</td>
+          <td><span [class]="statusClass(h.action)">{{ h.action }}</span></td>
           <td>{{ h.reason || '-' }}</td>
           <td>{{ h.actionDate | date: 'short' }}</td>
         </tr>
@@ -99,7 +102,7 @@
   </div>
 
   <!-- Reports Tab -->
-  <div *ngIf="activeTab === 'reports'">
+  <div class="section-card reports" *ngIf="activeTab === 'reports'">
     <h3>By Status</h3>
     <table>
       <thead>
