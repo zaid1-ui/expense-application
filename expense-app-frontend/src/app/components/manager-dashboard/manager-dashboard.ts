@@ -18,6 +18,7 @@ export class ManagerDashboard implements OnInit {
   message = '';
   errorMessage = '';
   reasonInputs: { [id: number]: string } = {};
+  expandedFormId: number | null = null;
 
   constructor(
     private expenseService: Expense,
@@ -33,6 +34,10 @@ export class ManagerDashboard implements OnInit {
       next: (data) => (this.forms = data),
       error: () => (this.errorMessage = 'Failed to load forms.'),
     });
+  }
+
+  toggleDetails(id: number): void {
+    this.expandedFormId = this.expandedFormId === id ? null : id;
   }
 
   approve(id: number): void {

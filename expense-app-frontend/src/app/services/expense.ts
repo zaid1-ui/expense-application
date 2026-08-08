@@ -103,8 +103,13 @@ export class Expense {
     return this.http.get(`${this.adminUrl}/transactions?${params}`, { headers: this.getHeaders() });
   }
 
-  getApprovalHistory(): Observable<any> {
-    return this.http.get(`${this.adminUrl}/approval-history`, { headers: this.getHeaders() });
+  getApprovalHistory(action?: string, employeeName?: string): Observable<any> {
+    let params = '';
+    if (action) params += `action=${action}&`;
+    if (employeeName) params += `employeeName=${employeeName}`;
+    return this.http.get(`${this.adminUrl}/approval-history?${params}`, {
+      headers: this.getHeaders(),
+    });
   }
 
   getReportByStatus(): Observable<any> {

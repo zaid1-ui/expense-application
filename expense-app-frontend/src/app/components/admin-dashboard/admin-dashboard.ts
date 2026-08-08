@@ -23,6 +23,8 @@ export class AdminDashboard implements OnInit {
 
   filterStatus = '';
   filterEmployee = '';
+  historyFilterAction = '';
+  historyFilterEmployee = '';
   errorMessage = '';
 
   constructor(
@@ -49,10 +51,12 @@ export class AdminDashboard implements OnInit {
   }
 
   loadHistory(): void {
-    this.expenseService.getApprovalHistory().subscribe({
-      next: (data) => (this.history = data),
-      error: () => (this.errorMessage = 'Failed to load history.'),
-    });
+    this.expenseService
+      .getApprovalHistory(this.historyFilterAction, this.historyFilterEmployee)
+      .subscribe({
+        next: (data) => (this.history = data),
+        error: () => (this.errorMessage = 'Failed to load history.'),
+      });
   }
 
   loadReports(): void {

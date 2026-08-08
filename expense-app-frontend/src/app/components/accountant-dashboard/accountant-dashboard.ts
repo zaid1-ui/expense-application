@@ -17,6 +17,7 @@ export class AccountantDashboard implements OnInit {
   filterEmployee = '';
   message = '';
   errorMessage = '';
+  expandedFormId: number | null = null;
 
   constructor(
     private expenseService: Expense,
@@ -32,6 +33,10 @@ export class AccountantDashboard implements OnInit {
       next: (data) => (this.forms = data),
       error: () => (this.errorMessage = 'Failed to load forms.'),
     });
+  }
+
+  toggleDetails(id: number): void {
+    this.expandedFormId = this.expandedFormId === id ? null : id;
   }
 
   pay(id: number): void {

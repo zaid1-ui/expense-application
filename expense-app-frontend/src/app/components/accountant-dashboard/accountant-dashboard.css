@@ -41,3 +41,7 @@ button {
 .filters select {
   margin-right: 10px;
 }
+.items-table {
+  background: #f9f9f9;
+  margin: 0;
+}

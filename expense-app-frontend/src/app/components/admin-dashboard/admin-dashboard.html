@@ -59,6 +59,21 @@
 
   <!-- History Tab -->
   <div *ngIf="activeTab === 'history'">
+    <div class="filters">
+      <input
+        type="text"
+        placeholder="Filter by employee"
+        [(ngModel)]="historyFilterEmployee"
+        (input)="loadHistory()"
+      />
+      <select [(ngModel)]="historyFilterAction" (change)="loadHistory()">
+        <option value="">All Actions</option>
+        <option value="Submitted">Submitted</option>
+        <option value="Approved">Approved</option>
+        <option value="ChangeRequested">Change Requested</option>
+        <option value="Paid">Paid</option>
+      </select>
+    </div>
     <table>
       <thead>
         <tr>
